@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+    tools {
+        nodejs 'my node'
+    }
+    stages {
+        stage('Git Cloning') {
+            steps {
+                echo 'Cloning files from GitHub'
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/digvijay-0406/Node-pipeline.git']])
+            }
+        }
+        stage('Build') {
+            steps {
+                echo 'Building Node.js project'
+                sh 'npm install'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Testing project'
+                sh './node_modules/mocha/bin/_mocha --exit ./test/test.js'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo 'Deploying Node.js project on live server'
+                script {
+                    sshagent(['43ea5f12-14d5-47ab-b11b-f7860a4bb332']) {
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ec2-user@3.110.136.240 <<EOF
+                            cd /home/ec2-user/Node-pipeline/
+                            git pull https://github.com/digvijay-0406/Node-pipeline.git
+                            npm install
+                            sudo npm install -g pm2
+                            pm2 restart index.js || pm2 start index.js
+                            exit
+                            EOF
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
